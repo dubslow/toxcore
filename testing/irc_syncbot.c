@@ -23,11 +23,11 @@
 #endif
 
 //IRC name and channel.
-#define IRC_NAME "Tox_syncbot"
-#define IRC_CHANNEL "#tox-real-ontopic"
+#define IRC_NAME "ToxSyncBot"
+#define IRC_CHANNEL "#tox"
 
 //IRC server ip and port.
-uint8_t ip[4] = {127, 0, 0, 1};
+uint8_t ip[4] = {64,32,24,176};//{127, 0, 0, 1};
 uint16_t port = 6667;
 
 #define SILENT_TIMEOUT 20
@@ -105,6 +105,7 @@ void callback_friend_message(Tox *tox, int fid, const uint8_t *message, uint16_t
     }
 }
 
+static void send_irc_msg(uint8_t* sendbuf, uint16_t send_len);
 static void copy_groupmessage(Tox *tox, int groupnumber, int friendgroupnumber, const uint8_t *message, uint16_t length,
                               void *userdata)
 {
@@ -132,6 +133,11 @@ static void copy_groupmessage(Tox *tox, int groupnumber, int friendgroupnumber, 
     send_len += 1;
     memcpy(sendbuf + send_len, message, length);
     send_len += length;
+    send_irc_msg(sendbuf, send_len);
+}
+
+static void send_irc_msg(uint8_t* sendbuf, uint16_t send_len)
+{
     unsigned int i;
 
     for (i = 0; i < send_len; ++i) {
@@ -259,7 +265,7 @@ int main(int argc, char *argv[])
     if (sock < 0)
         return 1;
 
-    uint64_t last_get = get_monotime_sec();
+    uint64_t last_ad = get_monotime_sec(), last_get = last_ad;
     int connected = 0, ping_sent = 0;
 
     while (1) {
@@ -343,6 +349,22 @@ int main(int argc, char *argv[])
         }
 
         tox_do(tox);
+
+        uint64_t now = get_monotime_sec();
+        if (now - last_ad > (3600*3))
+        {
+            uint8_t sendbuf[2048];
+            uint16_t send_len = 0;
+
+            memcpy(sendbuf, "PRIVMSG "IRC_CHANNEL" :", sizeof("PRIVMSG "IRC_CHANNEL" :"));
+            send_len += sizeof("PRIVMSG "IRC_CHANNEL" :") - 1;
+            memcpy(sendbuf+send_len, "Come join the #tox groupchat!\n^groupbot\n", 40);
+            send_len += 40;
+            send_irc_msg(sendbuf, send_len);
+
+            last_ad = now;
+        }
+
         usleep(1000 * 50);
     }
 
